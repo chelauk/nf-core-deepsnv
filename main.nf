@@ -443,3 +443,53 @@ def checkHostname() {
         }
     }
 }
+
+// functions
+
+
+// Check if a row has the expected number of item
+def checkNumberOfItem(row, number) {
+    if (row.size() != number) exit 1, "Malformed row in TSV file: ${row}, see --help for more information"
+    return true
+}
+
+// Return status [0,1]
+// 0 == Normal, 1 == Tumor
+def returnStatus(it) {
+    if (!(it in [0, 1])) exit 1, "Status is not recognized in TSV file: ${it}, see --help for more information"
+    return it
+}
+
+// Return file if it exists
+def returnFile(it) {
+    if (!file(it).exists()) exit 1, "Missing file in TSV file: ${it}, see --help for more information"
+    return file(it)
+}
+
+// Check file extension
+def hasExtension(it, extension) {
+    it.toString().toLowerCase().endsWith(extension.toLowerCase())
+}
+
+// Channeling the TSV file containing Recalibration Tables.
+// Format is: "subject gender status sample bam bai recalTable"
+def extractRecal(tsvFile) {
+    Channel.from(tsvFile)
+        .splitCsv(sep: '\t')
+        .map { row ->
+            checkNumberOfItem(row, 7)
+            def idPatient  = row[0]
+            def gender     = row[1]
+            def status     = returnStatus(row[2].toInteger())
+            def idSample   = row[3]
+            def bamFile    = returnFile(row[4])
+            def baiFile    = returnFile(row[5])
+            def recalTable = returnFile(row[6])
+
+            if (!hasExtension(bamFile, "bam")) exit 1, "File: ${bamFile} has the wrong extension. See --help for more information"
+            if (!hasExtension(baiFile, "bai")) exit 1, "File: ${baiFile} has the wrong extension. See --help for more information"
+            if (!hasExtension(recalTable, "recal.table")) exit 1, "File: ${recalTable} has the wrong extension. See --help for more information"
+
+            [idPatient, gender, status, idSample, bamFile, baiFile, recalTable]
+    }
+}
