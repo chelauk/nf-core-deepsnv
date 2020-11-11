@@ -26,7 +26,7 @@ def helpMessage() {
                                       Available: conda, docker, singularity, test, awsbatch, <institute> and more
 
     References                        If not specified in the configuration file or you wish to overwrite any of the references
-      --fasta [file]                  Path to fasta reference
+      --genome [str]                  GRCh38 or GRCh37
 
     Other options:
       --outdir [file]                 The output directory where the results will be saved
@@ -52,22 +52,6 @@ if (params.help) {
 /*
  * SET UP CONFIGURATION VARIABLES
  */
-
-// Check if genome exists in the config file
-if (params.genomes && params.genome && !params.genomes.containsKey(params.genome)) {
-    exit 1, "The provided genome '${params.genome}' is not available in the iGenomes file. Currently the available genomes are ${params.genomes.keySet().join(", ")}"
-}
-
-// TODO nf-core: Add any reference files that are needed
-// Configurable reference genomes
-//
-// NOTE - THIS IS NOT USED IN THIS PIPELINE, EXAMPLE ONLY
-// If you want to use the channel below in a process, define the following:
-//   input:
-//   file fasta from ch_fasta
-//
-params.fasta = params.genome ? params.genomes[ params.genome ].fasta ?: false : false
-if (params.fasta) { ch_fasta = file(params.fasta, checkIfExists: true) }
 
 // Has the run name been specified by the user?
 // this has the bonus effect of catching both -name and --name
@@ -109,8 +93,23 @@ if (tsvPath) {
 
 (genderMap, statusMap, inputSample) = extractInfos(inputSample)
 
-params.dict = params.genome && params.fasta ? params.genomes[params.genome].dict ?: null : null
+process deepSNV {
 
+label 'process_high'
+
+tag "${id_project}_${chr}"
+
+input:
+set idPatient, idSample, file(bamFile), file(baiFile) from inputSample
+
+output:
+file(*vcf) into deepSNV_out
+
+script:
+"""
+echo  "${idPatient} ${idSample} ${bamFile}"
+"""
+}
 
 
 
@@ -166,26 +165,6 @@ Channel.from(summary.collect{ [it.key, it.value] })
         </dl>
     """.stripIndent() }
     .set { ch_workflow_summary }
-
-
-process deepSNV {
-
-label 'process_high'
-
-tag "${id_project}_${chr}"
-
-input:
-set ${tumour} file{normal} from inputSample
-
-output:
-file(*vcf) into deepSNV_out
-
-script:
-"""
-RScript --vanilla deep_snv.R
-"""
-}
-
 
 /*
  * Parse software version numbers
