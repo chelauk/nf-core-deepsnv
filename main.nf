@@ -25,10 +25,6 @@ def helpMessage() {
       -profile [str]                  Configuration profile to use. Can use multiple (comma separated)
                                       Available: conda, docker, singularity, test, awsbatch, <institute> and more
 
-    Options:
-      --genome [str]                  Name of iGenomes reference
-      --single_end [bool]             Specifies that the input is single-end reads
-
     References                        If not specified in the configuration file or you wish to overwrite any of the references
       --fasta [file]                  Path to fasta reference
 
@@ -96,6 +92,19 @@ ch_multiqc_config = file("$baseDir/assets/multiqc_config.yaml", checkIfExists: t
 ch_multiqc_custom_config = params.multiqc_config ? Channel.fromPath(params.multiqc_config, checkIfExists: true) : Channel.empty()
 ch_output_docs = file("$baseDir/docs/output.md", checkIfExists: true)
 ch_output_docs_images = file("$baseDir/docs/images/", checkIfExists: true)
+
+// Handle input
+tsvPath = null
+if (params.input && (hasExtension(params.input, "tsv")) tsvPath = params.input
+
+// read input file
+
+inputSample = Channel.empty()
+if (tsvPath) {
+    tsvFile = file(tsvPath)
+} else if (params.input && !hasExtension(params.input, "tsv")) {
+    log.info "No TSV file"
+}
 
 /*
  * Create a channel for input read files
