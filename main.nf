@@ -79,14 +79,14 @@ ch_output_docs_images = file("$baseDir/docs/images/", checkIfExists: true)
 
 // Handle input
 tsvPath = null
-if (params.input && (hasExtension(params.input, "tsv")) tsvPath = params.input
+if (params.input && hasExtension(params.input, "tsv")) tsvPath = params.input
 
 // read input file
 
 inputSample = Channel.empty()
 if (tsvPath) {
     tsvFile = file(tsvPath)
-    inputSample = extractRecal(tsvFile)
+    inputSample = extractBam(tsvFile)
 } else if (params.input && !hasExtension(params.input, "tsv")) {
     log.info "No TSV file"
 }
