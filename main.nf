@@ -107,29 +107,12 @@ if (tsvPath) {
     log.info "No TSV file"
 }
 
-/*
- * Create a channel for input read files
- */
-if (params.input_paths) {
-    if (params.single_end) {
-        Channel
-            .from(params.input_paths)
-            .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true) ] ] }
-            .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { ch_read_files_fastqc; ch_read_files_trimming }
-    } else {
-        Channel
-            .from(params.input_paths)
-            .map { row -> [ row[0], [ file(row[1][0], checkIfExists: true), file(row[1][1], checkIfExists: true) ] ] }
-            .ifEmpty { exit 1, "params.input_paths was empty - no input files supplied" }
-            .into { ch_read_files_fastqc; ch_read_files_trimming }
-    }
-} else {
-    Channel
-        .fromFilePairs(params.input, size: params.single_end ? 1 : 2)
-        .ifEmpty { exit 1, "Cannot find any reads matching: ${params.input}\nNB: Path needs to be enclosed in quotes!\nIf this is single-end data, please specify --single_end on the command line." }
-        .into { ch_read_files_fastqc; ch_read_files_trimming }
-}
+(genderMap, statusMap, inputSample) = extractInfos(inputSample)
+
+params.dict = params.genome && params.fasta ? params.genomes[params.genome].dict ?: null : null
+
+
+
 
 // Header log info
 log.info nfcoreHeader()
@@ -184,6 +167,26 @@ Channel.from(summary.collect{ [it.key, it.value] })
     """.stripIndent() }
     .set { ch_workflow_summary }
 
+
+process deepSNV {
+
+label 'process_high'
+
+tag "${id_project}_${chr}"
+
+input:
+set ${tumour} file{normal} from inputSample
+
+output:
+file(*vcf) into deepSNV_out
+
+script:
+"""
+RScript --vanilla deep_snv.R
+"""
+}
+
+
 /*
  * Parse software version numbers
  */
@@ -203,32 +206,9 @@ process get_software_versions {
     """
     echo $workflow.manifest.version > v_pipeline.txt
     echo $workflow.nextflow.version > v_nextflow.txt
-    fastqc --version > v_fastqc.txt
+    R --version > v_R.txt
     multiqc --version > v_multiqc.txt
     scrape_software_versions.py &> software_versions_mqc.yaml
-    """
-}
-
-/*
- * STEP 1 - FastQC
- */
-process fastqc {
-    tag "$name"
-    label 'process_medium'
-    publishDir "${params.outdir}/fastqc", mode: params.publish_dir_mode,
-        saveAs: { filename ->
-                      filename.indexOf(".zip") > 0 ? "zips/$filename" : "$filename"
-                }
-
-    input:
-    set val(name), file(reads) from ch_read_files_fastqc
-
-    output:
-    file "*_fastqc.{zip,html}" into ch_fastqc_results
-
-    script:
-    """
-    fastqc --quiet --threads $task.cpus $reads
     """
 }
 
@@ -471,25 +451,21 @@ def hasExtension(it, extension) {
     it.toString().toLowerCase().endsWith(extension.toLowerCase())
 }
 
-// Channeling the TSV file containing Recalibration Tables.
-// Format is: "subject gender status sample bam bai recalTable"
-def extractRecal(tsvFile) {
+// Channeling the TSV file containing BAM.
+// Format is: "subject gender status sample bam bai"
+def extractBam(tsvFile) {
     Channel.from(tsvFile)
         .splitCsv(sep: '\t')
         .map { row ->
-            checkNumberOfItem(row, 7)
-            def idPatient  = row[0]
-            def gender     = row[1]
-            def status     = returnStatus(row[2].toInteger())
-            def idSample   = row[3]
-            def bamFile    = returnFile(row[4])
-            def baiFile    = returnFile(row[5])
-            def recalTable = returnFile(row[6])
-
+            checkNumberOfItem(row, 6)
+            def idPatient = row[0]
+            def gender    = row[1]
+            def status    = returnStatus(row[2].toInteger())
+            def idSample  = row[3]
+            def bamFile   = returnFile(row[4])
+            def baiFile   = returnFile(row[5])
             if (!hasExtension(bamFile, "bam")) exit 1, "File: ${bamFile} has the wrong extension. See --help for more information"
             if (!hasExtension(baiFile, "bai")) exit 1, "File: ${baiFile} has the wrong extension. See --help for more information"
-            if (!hasExtension(recalTable, "recal.table")) exit 1, "File: ${recalTable} has the wrong extension. See --help for more information"
-
-            [idPatient, gender, status, idSample, bamFile, baiFile, recalTable]
-    }
+            return [idPatient, gender, status, idSample, bamFile, baiFile]
+        }
 }
