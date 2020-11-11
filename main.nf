@@ -102,6 +102,7 @@ if (params.input && (hasExtension(params.input, "tsv")) tsvPath = params.input
 inputSample = Channel.empty()
 if (tsvPath) {
     tsvFile = file(tsvPath)
+    inputSample = extractRecal(tsvFile)
 } else if (params.input && !hasExtension(params.input, "tsv")) {
     log.info "No TSV file"
 }
