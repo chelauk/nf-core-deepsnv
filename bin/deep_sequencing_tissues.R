@@ -13,17 +13,23 @@ library("readr")
 library("stringr")
 
 option_list = list(
-    make_option(c("-m", "--mc_cores"),     type="integer",   default=6,         help="number of cores to use", metavar="character"),
-    make_option(c("-g", "--genome_ver"),   type="character", default="GRCh37",  help="BS-genome to use",       metavar="character"),
-    make_option(c("-p", "--project_name"), type="character", default="project", help="project_name",           metavar="character"),
-    make_option(c("-o", "--opt_q"),        type="integer",   default=25,        help="base quality for bam",   metavar="character"),
-    make_option(c("-q", "--opt_mq"),       type="integer",   default= 0,        help="map quality for bam",    metavar="character"),
-    make_option(c("-c", "--contig_id"),    type="character", default="chr1",    help="contig id",              metavar="character"),
-    make_option(c("-d", "--contig_det"),   type="character", default='length=249250621,file="Homo_sapiens.GRCh37.dna.primary_assembly.fa",species="Homo sapiens"', 
-              help="contig details", metavar="character"),
-    make_option(c("-v", "--minCoverage"), type="integer",    default=200,       help="minimum coverage",       metavar="character"),
-    make_option(c("-b", "--postProbCutoff"), type="double", default=0.05,       help="minimum coverage",       metavar="character")
-)
+    make_option(c("-m", "--mc_cores"), type="integer", default=6, 
+              help="number of cores to use", metavar="character"),
+    make_option(c("-g", "--genome_ver"), type="character", default="GRCh37",
+              help="BS-genome to use", metavar="character"),
+    make_option(c("-p", "--project_name"), type="character", default="project", 
+              help="project_name", metavar="character"),
+    make_option(c("-o", "--opt_q"), type="integer", default=25, 
+              help="base quality for bam", metavar="character"),
+    make_option(c("-q", "--opt_mq"), type="integer", default= 0, 
+              help="map quality for bam", metavar="character"),
+    make_option(c("-c", "--contig_id"), type="character", default="chr1", 
+              help="contig id", metavar="character"),
+    make_option(c("-v", "--minCoverage"), type="integer", default=200, 
+              help="minimum coverage", metavar="character"),
+    make_option(c("-b", "--postProbCutoff"), type="double", default=0.05, 
+              help="minimum coverage", metavar="character")
+); 
 
 opt_parser = OptionParser(option_list=option_list)
 opt = parse_args(opt_parser)
@@ -39,7 +45,6 @@ project        <- opt$project_name
 opt_q          <- opt$opt_q     # base quality filter for loading of bam files
 opt_mq         <- opt$opt_mq      # map quality filter for loading of bam files 
 contig_id      <- opt$contig_id # contig id
-contig_det     <- opt$contig_det
 minCoverage    <- opt$minCoverage    # Minimum depth to use locus for mutation calls 
 postProbCutoff <- opt$postProbCutoff   # Cutoff for the posterior prob to call mutation
 
@@ -178,7 +183,6 @@ targetFile2Contexts <- function(bedFile, genome=genome_ver,chrom, chr_prefix=NUL
   stopifnot("BSgenome" %in% class(genome))
   # Load the target list:
   targets =  read_tsv(bedFile) %>% as("GRanges") 
-  
   targets = targets[seqnames(targets) == chrom,]
   if(!grepl("chr", seqlevels(targets)[1])) {
     chr_prefix="chr"
@@ -200,13 +204,29 @@ targetFile2Contexts <- function(bedFile, genome=genome_ver,chrom, chr_prefix=NUL
   }
   return(result_data)
 }
+
+write_vcf_header <- function(project,contig){
+  sink(paste0(project,"_",contig,".vcf"))
+  cat("##fileformat=VCFv4.2\n")
+  cat(paste0("##fileDate=",str_split(Sys.time()," ")[[1]][1] %>% str_remove_all("-"),"\n"))
+  cat(paste0("##source=",package.version("DeepSNV"),"\n"))
+  cat(paste0('##reference=',providerVersion(BSgenome.Hsapiens.UCSC.hg19),"\n"))
+  cat(paste0('##contig=<ID=',contig_id,">\n"))
+  cat('##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of Samples With Data">\n')
+  cat('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
+  cat('##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">\n')
+  cat('##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">\n')
+  cat(paste0("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t", paste0(colnames(snv_df)[-(1:4)],collapse = "\t"),"\n"))
+  sink()
+}
 bams_n <- list.files(path = 'normal/', pattern = "bam", full.names = TRUE)
 bams_t <- list.files(path = 'tumor/', pattern = "bam", full.names = TRUE)
 
 # chr <- str_split(bedfile,"_|\\.",simplify = T)[2]
 contig <- opt$contig_id
 targets <- list.files(path = '.', pattern = "bed") # bed file of targets
-print(targets)
+
+contig <- "chr21"
 # Load target data:
 target_data <- read_tsv(targets, col_names = TRUE, 
                         col_types = cols(.default = col_character())) %>% 
@@ -227,7 +247,10 @@ target_data <- target_data[seqnames(target_data) == contig]
 
 # Expand the target object and determine mutation context for all variants:
 contexts <- targetFile2Contexts(targets,chrom=contig)
-
+if(is.null(contexts)){
+  write_vcf_header(project = project,contig = contig)
+  quit(status = 0)
+}
 ####Extract count data for normal (i.e. BUFFY coat) samples:
 # Determine all available reference bam files 
 
@@ -379,18 +402,6 @@ snv_df <- snv_df %>% unite("alt/tot", alt_counts:total_counts, sep = "/") %>% pi
 snv_df <- snv_df[order(snv_df$pos),]
 snv_df <- mutate(snv_df, ref = ifelse(ref == "-", ".", ref), alt = ifelse(alt  == "-", ".", alt ))
 
-# Start writing to an output file
-sink(paste0(project,"_",contig,".vcf"))
-cat("##fileformat=VCFv4.2\n")
-cat(paste0("##fileDate=",str_split(Sys.time()," ")[[1]][1] %>% str_remove_all("-"),"\n"))
-cat(paste0("##source=",package.version("DeepSNV"),"\n"))
-cat(paste0('##reference=',providerVersion(BSgenome.Hsapiens.UCSC.hg19),"\n"))
-cat(paste0('##contig=<ID=',contig_id,",",contig_det,">\n"))
-cat('##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of Samples With Data">\n')
-cat('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
-cat('##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">\n')
-cat('##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">\n')
-cat(paste0("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t", paste0(colnames(snv_df)[-(1:4)],collapse = "\t"),"\n"))
 
 get_row_info <- function(read_count,ref,alt){
   gt <- ''
@@ -419,7 +430,7 @@ paste0(df[1],"\t",as.integer(df[2]),"\t.\t",df[3],"\t",df[4],"\t",".","\t",".","
                    paste0('NS=',sum(!is.na(df[-(1:4)]))),"\t",'GT:AD:DP',"\t",
                   str_c(sapply(df[-(1:4)], get_row_info, df[3],df[4]),collapse = "\t"),"\n")
 }
-
+sink(paste0(project,"_",contig,".vcf"),append = TRUE)
 cat(apply(snv_df,1,vcf_lines),sep = '')
 sink()
 
