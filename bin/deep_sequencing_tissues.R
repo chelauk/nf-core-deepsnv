@@ -11,8 +11,6 @@ library("tidyverse")
 library("abind")
 library("readr")
 library("stringr")
-# library("ggplot2")
-source("functions/modified_deepsnv_function_bbb.R")
 
 option_list = list(
     make_option(c("-m", "--mc_cores"), type="integer", default=6, 
@@ -55,6 +53,131 @@ postProbCutoff <- opt$postProbCutoff   # Cutoff for the posterior prob to call m
 
 # load appropriate library
 library(genome_ver,character.only = TRUE)
+
+estimateRho <- deepSNV:::estimateRho
+
+bbb_mod <-
+  function (counts,
+            rho = NULL,
+            alternative = "greater",
+            truncate = 0.1,
+            rho.min = 1e-04,
+            rho.max = 0.1,
+            pseudo = .Machine$double.eps, # the smallest positive floating-point number x
+            # such that 1 + x != 1. 
+            # It equals double.base ^ ulp.digits if either 
+            # double.base is 2 or double.rounding is 0;
+            # otherwise, 
+            # it is (double.base ^ double.ulp.digits)/ 2. Normally 2.220446e-16.
+            return.value = c("BF", "P0", "err"),
+            model = c("OR", "AND",
+                      "adaptive"),
+            min.cov = NULL,
+            max.odds = 10,
+            mu.min = 1e-06,
+            mu.max = 1 - mu.min,
+            min.depth = 1000)
+  {
+    pseudo.rho = .Machine$double.eps
+    model = match.arg(model)
+    return.value = match.arg(return.value)
+    ncol = dim(counts)[3] / 2
+    x.fw = counts[, , 1:ncol, drop = FALSE]
+    x.bw = counts[, , 1:ncol + ncol, drop = FALSE]
+    n.fw = rep(rowSums(x.fw, dims = 2), dim(x.fw)[3])
+    n.bw = rep(rowSums(x.bw, dims = 2), dim(x.bw)[3])
+    x <- x.fw + x.bw
+    n = array(n.fw + n.bw, dim = dim(x)[1:2])
+    mu = (x + pseudo.rho) / (rep(n + ncol * pseudo.rho, dim(x)[3]))
+    ix = (mu < truncate)
+    ix[1, ,] <- FALSE
+    for (i in seq_len(ncol)) {
+      ix[, , i] <- (n > min.depth) & ix[, , i]
+    }
+    
+    if (is.null(rho)) {
+      rho = estimateRho(x, mu, ix)
+      rho = pmin(pmax(rho, rho.min), rho.max)
+      rho[is.na(rho)] = rho.min
+    }
+    X = colSums(x, dims = 1)
+    bound = function(x, xmin, xmax) {
+      x = pmax(x, xmin)
+      x = pmin(x, xmax)
+      return(x)
+    }
+    disp = (1 - rho) / rho
+    rdisp <- rep(disp, each = nrow(counts))
+    mu = (x + pseudo) / (rep(n + ncol * pseudo, dim(x)[3]))
+    mu = bound(mu, mu.min, mu.max) * rdisp
+    tr.fw = x.fw * ix
+    X.fw = rep(colSums(tr.fw, dims = 1), each = nrow(counts)) - tr.fw
+    N.fw = rep(colSums(n.fw * ix), each = nrow(counts)) - n.fw *  ix
+    nu0.fw <- (X.fw + x.fw + pseudo) / (N.fw + n.fw + ncol * pseudo)
+    nu0.fw <- bound(nu0.fw, mu.min, mu.max) * rdisp
+    mu0.bw <- (x.bw + pseudo) / (n.bw + ncol * pseudo)
+    mu0.bw <- bound(mu0.bw, mu.min, mu.max) * rdisp
+    nu.fw <- (X.fw + pseudo) / (N.fw + ncol * pseudo)
+    nu.fw <- bound(nu.fw, mu.min, mu.max) * rdisp
+    tr.bw = x.bw * ix
+    X.bw = rep(colSums(tr.bw, dims = 1), each = nrow(counts)) -  tr.bw
+    N.bw = rep(colSums(n.bw * ix), each = nrow(counts)) - n.bw *  ix
+    nu0.bw <- (X.bw + x.bw + pseudo) / (N.bw + n.bw + ncol * pseudo)
+    nu0.bw <- bound(nu0.bw, mu.min, mu.max) * rdisp
+    mu0.fw <- (x.fw + pseudo) / (n.fw + ncol * pseudo)
+    mu0.fw <- bound(mu0.fw, mu.min, mu.max) * rdisp
+    nu.bw <- (X.bw + pseudo) / (N.bw + ncol * pseudo)
+    nu.bw <- bound(nu.bw, mu.min, mu.max) * rdisp
+    if (return.value == "err") {
+      nu0 <- (X.bw + tr.fw + X.fw + tr.bw + pseudo) / (N.bw + n.bw + N.fw + n.fw + ncol * pseudo)
+      nu0 <- bound(nu0, mu.min, mu.max)
+      return(list(
+        nu = nu0[1, , ],
+        nu.fw = (nu0.fw / rdisp)[1, , ],
+        nu.bw = (nu0.bw / rdisp)[1, , ],
+        rho = rho
+      ))
+    }
+    rm(tr.fw)
+    rm(tr.bw)
+    mu = pmax(mu, nu0.fw)
+    mu = pmax(mu, nu0.bw)
+    mu0.fw = pmax(mu0.fw, nu0.fw)
+    mu0.bw = pmax(mu0.bw, nu0.bw)
+    if (model %in% c("OR", "adaptive")) {
+      Bf.fw <- deepSNV:::logbb(x.fw, n.fw, nu0.fw, rdisp) + deepSNV:::logbb(x.bw, n.bw, mu0.bw, rdisp) + deepSNV:::logbb(X.fw, N.fw, nu0.fw, rdisp) - deepSNV:::logbb(x.fw, n.fw, mu, rdisp) - deepSNV:::logbb(x.bw, n.bw, mu, rdisp) - deepSNV:::logbb(X.fw, N.fw, nu.fw, rdisp)
+      Bf.fw = exp(Bf.fw)
+      Bf.both = deepSNV:::logbb(x.fw, n.fw, nu0.fw, rdisp) + deepSNV:::logbb(X.fw,N.fw, nu0.fw, rdisp) - deepSNV:::logbb(x.fw, n.fw, mu, rdisp) - deepSNV:::logbb(X.fw, N.fw, nu.fw, rdisp)
+      rm(X.fw, N.fw, mu0.bw, nu.fw)
+      Bf.bw <- deepSNV:::logbb(x.fw, n.fw, mu0.fw, rdisp) + deepSNV:::logbb(x.bw, n.bw, nu0.bw, rdisp) + deepSNV:::logbb(X.bw, N.bw, nu0.bw,rdisp) - deepSNV:::logbb(x.fw, n.fw, mu, rdisp) - deepSNV:::logbb(x.bw, n.bw, mu, rdisp) - deepSNV:::logbb(X.bw, N.bw, nu.bw, rdisp)
+      Bf.bw = exp(Bf.bw)
+      Bf.both = Bf.both + deepSNV:::logbb(x.bw, n.bw, nu0.bw, rdisp) + deepSNV:::logbb(X.bw, N.bw, nu0.bw, rdisp) - deepSNV:::logbb(x.bw, n.bw, mu, rdisp) - deepSNV:::logbb(X.bw, N.bw, nu.bw, rdisp)
+      Bf.both = exp(Bf.both)
+      rm(X.bw, N.bw, mu0.fw, nu.bw)
+      rm(mu, nu0.fw, nu0.bw)
+      Bf = Bf.fw + Bf.bw - Bf.both + .Machine$double.xmin
+    }
+    else {
+      Bf.both = deepSNV:::logbb(x.fw, n.fw, nu0.fw, rdisp) + deepSNV:::logbb(X.fw,  N.fw, nu0.fw, rdisp) - deepSNV:::logbb(x.fw, n.fw, mu, rdisp) - deepSNV:::logbb(X.fw, N.fw, nu.fw, rdisp) + deepSNV:::logbb(x.bw, n.bw, nu0.bw, rdisp) + deepSNV:::logbb(X.bw, N.bw, nu0.bw, rdisp) - deepSNV:::logbb(x.bw, n.bw, mu, rdisp) - deepSNV:::logbb(X.bw, N.bw, nu.bw, rdisp)
+      Bf = exp(Bf.both)
+    }
+    if (model == "adaptive") {
+      if (!is.null(min.cov))
+        ix <- n.fw < min.cov | n.bw < min.cov
+      else
+        ix <- na.omit(abs(log10(n.fw / n.bw)) > log10(max.odds))
+      Bf[ix] <- Bf.both[ix]
+    }
+    cons = apply(X, 1, which.max)
+    for (i in 1:ncol(Bf))
+      Bf[, i, cons[i]] = NA
+    if (return.value == "P0") {
+      return(Bf / (1 + Bf))
+    }
+    else {
+      return(Bf)
+    }
+  }
 
 targetFile2Contexts <- function(bedFile, genome=genome_ver,chrom, chr_prefix=NULL){
   require(GenomicRanges)

@@ -24,6 +24,7 @@ def helpMessage() {
       --input [file]                  Path to input data (must be surrounded with quotes)
       -profile [str]                  Configuration profile to use. Can use multiple (comma separated)
                                       Available: conda, docker, singularity, test, awsbatch, <institute> and more
+      --bed  [file]                   target bed
 
     References                        If not specified in the configuration file or you wish to overwrite any of the references
       --genome [str]                  GRCh38 or GRCh37
@@ -78,6 +79,7 @@ ch_output_docs = file("$baseDir/docs/output.md", checkIfExists: true)
 ch_output_docs_images = file("$baseDir/docs/images/", checkIfExists: true)
 
 // Handle input
+bedFile = file(params.bed)
 tsvPath = null
 if (params.input && hasExtension(params.input, "tsv")) tsvPath = params.input
 
@@ -123,6 +125,7 @@ tag "${id_project}_${chr}"
 input:
 file('tumor/*') from bamTumor.collect()
 file('normal/*') from bamNormal.collect()
+file(bed) from bedFile
 
 output:
 file("*vcf") into deepSNV_out
