@@ -226,6 +226,7 @@ bams_t <- list.files(path = 'tumor/', pattern = "bam", full.names = TRUE)
 contig <- opt$contig_id
 targets <- list.files(path = '.', pattern = "bed") # bed file of targets
 
+contig <- "chr21"
 # Load target data:
 target_data <- read_tsv(targets, col_names = TRUE, 
                         col_types = cols(.default = col_character())) %>% 
@@ -429,6 +430,7 @@ paste0(df[1],"\t",as.integer(df[2]),"\t.\t",df[3],"\t",df[4],"\t",".","\t",".","
                    paste0('NS=',sum(!is.na(df[-(1:4)]))),"\t",'GT:AD:DP',"\t",
                   str_c(sapply(df[-(1:4)], get_row_info, df[3],df[4]),collapse = "\t"),"\n")
 }
+write_vcf_header(project,contig)
 sink(paste0(project,"_",contig,".vcf"),append = TRUE)
 cat(apply(snv_df,1,vcf_lines),sep = '')
 sink()
