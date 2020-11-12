@@ -28,6 +28,7 @@ def helpMessage() {
 
     References                        If not specified in the configuration file or you wish to overwrite any of the references
       --genome [str]                  GRCh38 or GRCh37
+      --fai   [file]
 
     Other options:
       --outdir [file]                 The output directory where the results will be saved
@@ -80,8 +81,11 @@ ch_output_docs_images = file("$baseDir/docs/images/", checkIfExists: true)
 
 // Handle input
 bedFile = file(params.bed)
+
 tsvPath = null
 if (params.input && hasExtension(params.input, "tsv")) tsvPath = params.input
+
+ch_fai = Channel.value(file(params.fai)) 
 
 // read input file
 
@@ -111,8 +115,23 @@ pairBam = bamNormal.cross(bamTumor).map {
     [normal[0], normal[1], normal[2], normal[3], tumor[1], tumor[2], tumor[3]]
 }
 */
-bamTumor  =  bamTumor.map { idPatient, idSample, bam, bai -> [bam, bai]}
-bamNormal = bamNormal.map { idPatient, idSample, bam, bai -> [bam, bai]}
+ch_fai = ch_fai
+             .splitCsv(sep: "\t")
+             .map{ chr -> chr[0] }
+             .filter( ~/^chr\d+|^chr[X,Y]|^\d+|[X,Y]/ )
+
+(ch_fai_t, ch_fai_n) = ch_fai.into(2)
+
+bamTumor  =  bamTumor.combine(ch_fai_t)
+bamNormal =  bamNormal.combine(ch_fai_n)                   
+
+bamTumor  =  bamTumor.map { idPatient, idSample, bam, bai ,chr -> tuple(bam, bai, chr)}
+                     .groupTuple(by: 2)
+
+bamNormal  =  bamNormal.map { idPatient, idSample, bam, bai ,chr -> tuple(bam, bai, chr)}
+                     .groupTuple(by: 2)
+            
+bamTumor = bamTumor.dump(tag: 'bam')
 
 process deepSNV {
 
@@ -123,8 +142,8 @@ label 'process_high'
 tag "${id_project}_${chr}"
 
 input:
-file('tumor/*') from bamTumor.collect()
-file('normal/*') from bamNormal.collect()
+set file('tumor/*'), file('tumor/*'), chr from bamTumor
+set file('normal/*'), file('normal/*'), input from bamNormal
 file(bed) from bedFile
 
 output:
@@ -132,7 +151,7 @@ file("*vcf") into deepSNV_out
 
 script:
 """
-deep_sequencing_tissues.R
+deep_sequencing_tissues.R -c $chr
 """
 }
 
@@ -143,6 +162,8 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
+summary['fai']             = params.fai
+summary['bed']              = params.bed
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
 if (workflow.containerEngine) summary['Container'] = "$workflow.containerEngine - $workflow.container"
 summary['Output dir']       = params.outdir
