@@ -93,7 +93,11 @@ if (tsvPath) {
 
 (genderMap, statusMap, inputSample) = extractInfos(inputSample)
 
+inputSample = inputSample.dump(tag: "inputSample")
+
 process deepSNV {
+
+echo true
 
 label 'process_high'
 
@@ -103,11 +107,11 @@ input:
 set idPatient, idSample, file(bamFile), file(baiFile) from inputSample
 
 output:
-file(*vcf) into deepSNV_out
+val(idPatient) into deepSNV_out
 
 script:
 """
-echo  "${idPatient} ${idSample} ${bamFile}"
+echo  "${idPatient} ${idSample} ${bamFile}" > file.vcf
 """
 }
 
@@ -120,7 +124,6 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
-summary['Fasta Ref']        = params.fasta
 summary['Data Type']        = params.single_end ? 'Single-End' : 'Paired-End'
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
 if (workflow.containerEngine) summary['Container'] = "$workflow.containerEngine - $workflow.container"
@@ -201,7 +204,6 @@ process multiqc {
     file (multiqc_config) from ch_multiqc_config
     file (mqc_custom_config) from ch_multiqc_custom_config.collect().ifEmpty([])
     // TODO nf-core: Add in log files from your new processes for MultiQC to find!
-    file ('fastqc/*') from ch_fastqc_results.collect().ifEmpty([])
     file ('software_versions/*') from ch_software_versions_yaml.collect()
     file workflow_summary from ch_workflow_summary.collectFile(name: "workflow_summary_mqc.yaml")
 
@@ -447,4 +449,20 @@ def extractBam(tsvFile) {
             if (!hasExtension(baiFile, "bai")) exit 1, "File: ${baiFile} has the wrong extension. See --help for more information"
             return [idPatient, gender, status, idSample, bamFile, baiFile]
         }
+}
+
+// Extract gender and status from Channel
+def extractInfos(channel) {
+    def genderMap = [:]
+    def statusMap = [:]
+    channel = channel.map{ it ->
+        def idPatient = it[0]
+        def gender = it[1]
+        def status = it[2]
+        def idSample = it[3]
+        genderMap[idPatient] = gender
+        statusMap[idPatient, idSample] = status
+        [idPatient] + it[3..-1]
+    }
+    [genderMap, statusMap, channel]
 }
