@@ -226,7 +226,6 @@ bams_t <- list.files(path = 'tumor/', pattern = "bam", full.names = TRUE)
 contig <- opt$contig_id
 targets <- list.files(path = '.', pattern = "bed") # bed file of targets
 
-contig <- "chr21"
 # Load target data:
 target_data <- read_tsv(targets, col_names = TRUE, 
                         col_types = cols(.default = col_character())) %>% 
@@ -235,10 +234,6 @@ target_data <- read_tsv(targets, col_names = TRUE,
 target_data <- target_data[seqnames(target_data) == contig]
 
 # targetFile2Contexts produces this
-#id      chr   pos   target    context                           ref
-#chr-pos chr   pos   bed       trinucleotide around position     #ref-nucleotide
-
-#eg
 #              chr      pos              target context ref
 #chr1:7202129    1  7202129   1:7202129-7202249     TGC   G
 #chr1:7202130    1  7202130   1:7202129-7202249     GCT   C
@@ -282,17 +277,12 @@ dimnames(countsN) <- list(basename(bams_n),
                           contexts$context,
                           c("A", "T", "C", "G", "-", "a", "t", "c", "g", "_"))
 
-
-
 # output:
 # array of matrices for each bam, each matrix rows = position (named ref 
 # nucleotide, in context)
 # columns  are "A", "T", "C", "G", "-", "a", "t", "c", "g", "_"
 
-
-
 ####Extract count data for other (tumour and matched normal) samples:
-
 countsT <-
   loadAllData(bams_t,
               target_data,
@@ -327,7 +317,6 @@ for (i in seq_len(dim(bgrNormal)[1])) {
 }
 
 ####Calling of mutations in tumour set with shearwater algorithm:
-
 prior <- 0.01 
 odds  <- prior / (1 - prior)
 
@@ -434,4 +423,3 @@ write_vcf_header(project,contig)
 sink(paste0(project,"_",contig,".vcf"),append = TRUE)
 cat(apply(snv_df,1,vcf_lines),sep = '')
 sink()
-
