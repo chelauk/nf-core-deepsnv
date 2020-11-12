@@ -129,7 +129,7 @@ file("*vcf") into deepSNV_out
 
 script:
 """
-ls tumor/* > file.vcf
+deep_sequencing_tissues.R
 """
 }
 
