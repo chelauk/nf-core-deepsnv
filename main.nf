@@ -93,7 +93,24 @@ if (tsvPath) {
 
 (genderMap, statusMap, inputSample) = extractInfos(inputSample)
 
-inputSample = inputSample.dump(tag: "inputSample")
+bamInput = inputSample
+
+// separate BAM by status
+bamNormal = Channel.create()
+bamTumor = Channel.create()
+
+bamInput
+    .choice(bamTumor, bamNormal) {statusMap[it[0], it[1]] == 0 ? 1 : 0}
+// Crossing Normal and Tumor to get a T/N pair for Somatic Variant Calling
+// Remapping channel to remove common key idPatient
+/*
+pairBam = bamNormal.cross(bamTumor).map {
+    normal, tumor ->
+    [normal[0], normal[1], normal[2], normal[3], tumor[1], tumor[2], tumor[3]]
+}
+*/
+bamTumor  =  bamTumor.map { idPatient, idSample, bam, bai -> [bam, bai]}
+bamNormal = bamNormal.map { idPatient, idSample, bam, bai -> [bam, bai]}
 
 process deepSNV {
 
@@ -104,18 +121,17 @@ label 'process_high'
 tag "${id_project}_${chr}"
 
 input:
-set idPatient, idSample, file(bamFile), file(baiFile) from inputSample
+file('tumor/*') from bamTumor.collect()
+file('normal/*') from bamNormal.collect()
 
 output:
-val(idPatient) into deepSNV_out
+file("*vcf") into deepSNV_out
 
 script:
 """
-echo  "${idPatient} ${idSample} ${bamFile}" > file.vcf
+ls tumor/* > file.vcf
 """
 }
-
-
 
 // Header log info
 log.info nfcoreHeader()
@@ -124,7 +140,6 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
-summary['Data Type']        = params.single_end ? 'Single-End' : 'Paired-End'
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
 if (workflow.containerEngine) summary['Container'] = "$workflow.containerEngine - $workflow.container"
 summary['Output dir']       = params.outdir
