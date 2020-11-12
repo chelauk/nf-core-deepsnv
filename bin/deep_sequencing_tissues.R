@@ -226,7 +226,6 @@ bams_t <- list.files(path = 'tumor/', pattern = "bam", full.names = TRUE)
 contig <- opt$contig_id
 targets <- list.files(path = '.', pattern = "bed") # bed file of targets
 
-contig <- "chr21"
 # Load target data:
 target_data <- read_tsv(targets, col_names = TRUE, 
                         col_types = cols(.default = col_character())) %>% 
