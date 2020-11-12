@@ -13,25 +13,17 @@ library("readr")
 library("stringr")
 
 option_list = list(
-    make_option(c("-m", "--mc_cores"), type="integer", default=6, 
-              help="number of cores to use", metavar="character"),
-    make_option(c("-g", "--genome_ver"), type="character", default="GRCh37",
-              help="BS-genome to use", metavar="character"),
-    make_option(c("-p", "--project_name"), type="character", default="project", 
-              help="project_name", metavar="character"),
-    make_option(c("-o", "--opt_q"), type="integer", default=25, 
-              help="base quality for bam", metavar="character"),
-    make_option(c("-q", "--opt_mq"), type="integer", default= 0, 
-              help="map quality for bam", metavar="character"),
-    make_option(c("-c", "--contig_id"), type="character", default="chr1", 
-              help="contig id", metavar="character"),
-    make_option(c("-d", "--contig_details"), type="character", default='length=249250621,file="Homo_sapiens.GRCh37.dna.primary_assembly.fa",species="Homo sapiens"', 
+    make_option(c("-m", "--mc_cores"),     type="integer",   default=6,         help="number of cores to use", metavar="character"),
+    make_option(c("-g", "--genome_ver"),   type="character", default="GRCh37",  help="BS-genome to use",       metavar="character"),
+    make_option(c("-p", "--project_name"), type="character", default="project", help="project_name",           metavar="character"),
+    make_option(c("-o", "--opt_q"),        type="integer",   default=25,        help="base quality for bam",   metavar="character"),
+    make_option(c("-q", "--opt_mq"),       type="integer",   default= 0,        help="map quality for bam",    metavar="character"),
+    make_option(c("-c", "--contig_id"),    type="character", default="chr1",    help="contig id",              metavar="character"),
+    make_option(c("-d", "--contig_det"),   type="character", default='length=249250621,file="Homo_sapiens.GRCh37.dna.primary_assembly.fa",species="Homo sapiens"', 
               help="contig details", metavar="character"),
-    make_option(c("-v", "--minCoverage"), type="integer", default=200, 
-              help="minimum coverage", metavar="character"),
-    make_option(c("-b", "--postProbCutoff"), type="double", default=0.05, 
-              help="minimum coverage", metavar="character")
-); 
+    make_option(c("-v", "--minCoverage"), type="integer",    default=200,       help="minimum coverage",       metavar="character"),
+    make_option(c("-b", "--postProbCutoff"), type="double", default=0.05,       help="minimum coverage",       metavar="character")
+)
 
 opt_parser = OptionParser(option_list=option_list)
 opt = parse_args(opt_parser)
@@ -47,7 +39,7 @@ project        <- opt$project_name
 opt_q          <- opt$opt_q     # base quality filter for loading of bam files
 opt_mq         <- opt$opt_mq      # map quality filter for loading of bam files 
 contig_id      <- opt$contig_id # contig id
-contig_details <- opt$contig_details
+contig_det     <- opt$contig_det
 minCoverage    <- opt$minCoverage    # Minimum depth to use locus for mutation calls 
 postProbCutoff <- opt$postProbCutoff   # Cutoff for the posterior prob to call mutation
 
@@ -186,6 +178,7 @@ targetFile2Contexts <- function(bedFile, genome=genome_ver,chrom, chr_prefix=NUL
   stopifnot("BSgenome" %in% class(genome))
   # Load the target list:
   targets =  read_tsv(bedFile) %>% as("GRanges") 
+  
   targets = targets[seqnames(targets) == chrom,]
   if(!grepl("chr", seqlevels(targets)[1])) {
     chr_prefix="chr"
@@ -392,7 +385,7 @@ cat("##fileformat=VCFv4.2\n")
 cat(paste0("##fileDate=",str_split(Sys.time()," ")[[1]][1] %>% str_remove_all("-"),"\n"))
 cat(paste0("##source=",package.version("DeepSNV"),"\n"))
 cat(paste0('##reference=',providerVersion(BSgenome.Hsapiens.UCSC.hg19),"\n"))
-cat(paste0('##contig=<ID=',contig_id,",",contig_details,">\n"))
+cat(paste0('##contig=<ID=',contig_id,",",contig_det,">\n"))
 cat('##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of Samples With Data">\n')
 cat('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
 cat('##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">\n')
