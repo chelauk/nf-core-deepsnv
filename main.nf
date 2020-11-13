@@ -25,7 +25,7 @@ def helpMessage() {
       -profile [str]                  Configuration profile to use. Can use multiple (comma separated)
                                       Available: conda, docker, singularity, test, awsbatch, <institute> and more
       --target_bed  [file]            target bed
-      --project     [str]
+      --project_id  [str]
 
     References                        If not specified in the configuration file or you wish to overwrite any of the references
       --genome [str]                  GRCh38 or GRCh37
@@ -82,7 +82,7 @@ ch_output_docs_images = file("$baseDir/docs/images/", checkIfExists: true)
 
 // Handle input
 ch_target_bed = params.target_bed ? Channel.value(file(params.target_bed)) : "null"
-ch_id_project = params.project ? Channel.value(params.project) : "project"
+ch_id_project = params.project_id ? Channel.value(params.project_id) : "project"
 tsvPath = null
 if (params.input && hasExtension(params.input, "tsv")) tsvPath = params.input
 
@@ -194,7 +194,7 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
-summary['Project']          = params.project
+if (params.project) summary['Project']          = params.project
 summary['fai']              = params.fai
 summary['bed']              = params.target_bed
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
