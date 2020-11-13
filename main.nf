@@ -194,7 +194,7 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
-summary['Project']          = params.id_project
+summary['Project']          = params.project
 summary['fai']              = params.fai
 summary['bed']              = params.target_bed
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
