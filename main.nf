@@ -24,7 +24,8 @@ def helpMessage() {
       --input [file]                  Path to input data (must be surrounded with quotes)
       -profile [str]                  Configuration profile to use. Can use multiple (comma separated)
                                       Available: conda, docker, singularity, test, awsbatch, <institute> and more
-      --target_bed  [file]                   target bed
+      --target_bed  [file]            target bed
+      --project     [str]
 
     References                        If not specified in the configuration file or you wish to overwrite any of the references
       --genome [str]                  GRCh38 or GRCh37
@@ -81,7 +82,7 @@ ch_output_docs_images = file("$baseDir/docs/images/", checkIfExists: true)
 
 // Handle input
 ch_target_bed = Channel.value(file(params.target_bed))
-ch_id_project = params.id_project ? Channel.value(params.id_project) : Channel.value("project")
+ch_id_project = params.project ? Channel.value(params.project) : "project"
 tsvPath = null
 if (params.input && hasExtension(params.input, "tsv")) tsvPath = params.input
 
@@ -171,7 +172,7 @@ process concatenateVcfs {
     input:
     file(vcf) from deepSNV_out.collect()
     file(fai) from ch_fai
-    id_project from ch_id_project
+    val id_project from ch_id_project
     file(targetBED) from ch_target_bed
 
     output:
