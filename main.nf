@@ -81,7 +81,7 @@ ch_output_docs_images = file("$baseDir/docs/images/", checkIfExists: true)
 
 // Handle input
 ch_target_bed = Channel.value(file(params.target_bed))
-ch_id_project = params.id_project ? : Channel.value(params.id_project) : "project"
+ch_id_project = params.id_project ? Channel.value(params.id_project) : "project"
 tsvPath = null
 if (params.input && hasExtension(params.input, "tsv")) tsvPath = params.input
 
