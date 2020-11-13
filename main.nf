@@ -24,7 +24,7 @@ def helpMessage() {
       --input [file]                  Path to input data (must be surrounded with quotes)
       -profile [str]                  Configuration profile to use. Can use multiple (comma separated)
                                       Available: conda, docker, singularity, test, awsbatch, <institute> and more
-      --bed  [file]                   target bed
+      --target_bed  [file]                   target bed
 
     References                        If not specified in the configuration file or you wish to overwrite any of the references
       --genome [str]                  GRCh38 or GRCh37
@@ -80,7 +80,7 @@ ch_output_docs = file("$baseDir/docs/output.md", checkIfExists: true)
 ch_output_docs_images = file("$baseDir/docs/images/", checkIfExists: true)
 
 // Handle input
-bedFile = file(params.bed)
+ch_target_bed = Channel.value(file(params.target_bed))
 
 tsvPath = null
 if (params.input && hasExtension(params.input, "tsv")) tsvPath = params.input
@@ -115,12 +115,15 @@ pairBam = bamNormal.cross(bamTumor).map {
     [normal[0], normal[1], normal[2], normal[3], tumor[1], tumor[2], tumor[3]]
 }
 */
-ch_fai = ch_fai
-             .splitCsv(sep: "\t")
-             .map{ chr -> chr[0] }
-             .filter( ~/^chr\d+|^chr[X,Y]|^\d+|[X,Y]/ )
 
-(ch_fai_t, ch_fai_n) = ch_fai.into(2)
+(ch_fai_for_deepSNV, ch_fai) = ch_fai.into(2)
+
+ch_fai_for_deepSNV = ch_fai_for_deepSNV
+                             .splitCsv(sep: "\t")
+                             .map{ chr -> chr[0] }
+                            .filter( ~/^chr\d+|^chr[X,Y]|^\d+|[X,Y]/ )
+
+(ch_fai_t, ch_fai_n) = ch_fai_for_deepSNV.into(2)
 
 bamTumor  =  bamTumor.combine(ch_fai_t)
 bamNormal =  bamNormal.combine(ch_fai_n)                   
@@ -144,7 +147,7 @@ tag "${id_project}_${chr}"
 input:
 set file('tumor/*'), file('tumor/*'), chr from bamTumor
 set file('normal/*'), file('normal/*'), input from bamNormal
-file(bed) from bedFile
+file(bed) from ch_target_bed
 
 output:
 file("*vcf") into deepSNV_out
@@ -153,6 +156,32 @@ script:
 """
 deep_sequencing_tissues.R -c $chr
 """
+}
+
+
+process concatenateVcfs {
+    
+    label 'cpus_max'
+        
+    tag "${id_project}"
+
+    publishDir "${params.outdir}/VariantCalling/${id_project}/deepSNV", mode: params.publish_dir_mode
+
+    input:
+    file(vcf) from deepSNV_out.collect()
+    file(fai) from ch_fai
+    file(targetBED) from bedFile
+
+    output:
+    file("*vcf.gz") into concatVCF_out
+
+    script:
+    outputFile = "${id_project}_deepSNV.vcf"
+    options = params.target_bed ? "-t ${targetBED}" : ""
+    intervalsOptions = params.no_intervals ? "-n" : ""
+    """
+    concatenateVCFs.sh -i ${fastaFai} -c ${task.cpus} -o ${outputFile} ${options} ${intervalsOptions}
+    """
 }
 
 // Header log info
