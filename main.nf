@@ -170,10 +170,10 @@ process concatenateVcfs {
     input:
     file(vcf) from deepSNV_out.collect()
     file(fai) from ch_fai
-    file(targetBED) from bedFile
+    file(targetBED) from ch_target_bed
 
     output:
-    file("*vcf.gz") into concatVCF_out
+    set file("*vcf.gz"), file("*vcf.gz.tbi")  into concatVCF_out
 
     script:
     outputFile = "${id_project}_deepSNV.vcf"
@@ -192,7 +192,7 @@ summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
 summary['fai']             = params.fai
-summary['bed']              = params.bed
+summary['bed']              = params.target_bed
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
 if (workflow.containerEngine) summary['Container'] = "$workflow.containerEngine - $workflow.container"
 summary['Output dir']       = params.outdir
