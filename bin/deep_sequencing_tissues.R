@@ -208,13 +208,13 @@ targetFile2Contexts <- function(bedFile, genome=genome_ver,chrom, chr_prefix=NUL
 bams_n <- list.files(path = 'normal/', pattern = "bam", full.names = TRUE)
 bams_t <- list.files(path = 'tumor/', pattern = "bam", full.names = TRUE)
 
-write_vcf_header <- function(project,contig){
-  sink(paste0(project,"_",contig,".vcf"))
+write_vcf_header <- function(contig){
+  sink(paste0(contig,".vcf"))
   cat("##fileformat=VCFv4.2\n")
   cat(paste0("##fileDate=",str_split(Sys.time()," ")[[1]][1] %>% str_remove_all("-"),"\n"))
   cat(paste0("##source=",package.version("DeepSNV"),"\n"))
   cat(paste0('##reference=',providerVersion(BSgenome.Hsapiens.UCSC.hg19),"\n"))
-  cat(paste0('##contig=<ID=',contig_id,">\n"))
+  cat(paste0('##contig=<ID=',contig,">\n"))
   cat('##INFO=<ID=NS,Number=1,Type=Integer,Description="Number of Samples With Data">\n')
   cat('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
   cat('##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">\n')
@@ -244,7 +244,7 @@ target_data <- target_data[seqnames(target_data) == contig]
 # Expand the target object and determine mutation context for all variants:
 contexts <- targetFile2Contexts(targets,chrom=contig)
 if(is.null(contexts)){
-  write_vcf_header(project = project,contig = contig)
+  write_vcf_header(contig = contig)
   quit(status = 0)
 }
 ####Extract count data for normal (i.e. BUFFY coat) samples:
