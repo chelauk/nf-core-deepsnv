@@ -81,7 +81,7 @@ ch_output_docs_images = file("$baseDir/docs/images/", checkIfExists: true)
 
 // Handle input
 ch_target_bed = Channel.value(file(params.target_bed))
-
+ch_id_project = params.id_project? : Channel.value(params.id_project) : "project"
 tsvPath = null
 if (params.input && hasExtension(params.input, "tsv")) tsvPath = params.input
 
@@ -138,24 +138,25 @@ bamTumor = bamTumor.dump(tag: 'bam')
 
 process deepSNV {
 
-echo true
+    echo true
 
-label 'process_high'
+    label 'process_high'
 
-tag "${id_project}_${chr}"
+    tag "${id_project}_${chr}"
 
-input:
-set file('tumor/*'), file('tumor/*'), chr from bamTumor
-set file('normal/*'), file('normal/*'), input from bamNormal
-file(bed) from ch_target_bed
+    input:
+    set file('tumor/*'), file('tumor/*'), chr from bamTumor
+    set file('normal/*'), file('normal/*'), input from bamNormal
+    id_project from ch_id_project
+        file(bed) from ch_target_bed
 
-output:
-file("*vcf") into deepSNV_out
+    output:
+    file("*vcf") into deepSNV_out
 
-script:
-"""
-deep_sequencing_tissues.R -c $chr
-"""
+    script:
+    """
+    deep_sequencing_tissues.R -c $chr
+    """
 }
 
 
@@ -170,6 +171,7 @@ process concatenateVcfs {
     input:
     file(vcf) from deepSNV_out.collect()
     file(fai) from ch_fai
+    id_project from ch_id_project
     file(targetBED) from ch_target_bed
 
     output:
@@ -191,7 +193,8 @@ if (workflow.revision) summary['Pipeline Release'] = workflow.revision
 summary['Run Name']         = custom_runName ?: workflow.runName
 // TODO nf-core: Report custom parameters here
 summary['Input']            = params.input
-summary['fai']             = params.fai
+summary['Project']          = params.id_project
+summary['fai']              = params.fai
 summary['bed']              = params.target_bed
 summary['Max Resources']    = "$params.max_memory memory, $params.max_cpus cpus, $params.max_time time per job"
 if (workflow.containerEngine) summary['Container'] = "$workflow.containerEngine - $workflow.container"
