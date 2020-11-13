@@ -205,6 +205,9 @@ targetFile2Contexts <- function(bedFile, genome=genome_ver,chrom, chr_prefix=NUL
   return(result_data)
 }
 
+bams_n <- list.files(path = 'normal/', pattern = "bam", full.names = TRUE)
+bams_t <- list.files(path = 'tumor/', pattern = "bam", full.names = TRUE)
+
 write_vcf_header <- function(project,contig){
   sink(paste0(project,"_",contig,".vcf"))
   cat("##fileformat=VCFv4.2\n")
@@ -216,11 +219,9 @@ write_vcf_header <- function(project,contig){
   cat('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
   cat('##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">\n')
   cat('##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read Depth">\n')
-  cat(paste0("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t", paste0(colnames(snv_df)[-(1:4)],collapse = "\t"),"\n"))
+  cat(paste0("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t", paste0(basename(bams_t),collapse = "\t"),"\n"))
   sink()
 }
-bams_n <- list.files(path = 'normal/', pattern = "bam", full.names = TRUE)
-bams_t <- list.files(path = 'tumor/', pattern = "bam", full.names = TRUE)
 
 # chr <- str_split(bedfile,"_|\\.",simplify = T)[2]
 contig <- opt$contig_id
