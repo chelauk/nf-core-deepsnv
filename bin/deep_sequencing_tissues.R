@@ -17,8 +17,6 @@ option_list = list(
               help="number of cores to use", metavar="character"),
     make_option(c("-g", "--genome_ver"), type="character", default="GRCh37",
               help="BS-genome to use", metavar="character"),
-    make_option(c("-p", "--project_name"), type="character", default="project", 
-              help="project_name", metavar="character"),
     make_option(c("-o", "--opt_q"), type="integer", default=25, 
               help="base quality for bam", metavar="character"),
     make_option(c("-q", "--opt_mq"), type="integer", default= 0, 
@@ -41,7 +39,6 @@ if(opt$genome_ver == "GRCh37"){
 } else if (opt$genome_ver == "GRCh38"){
   genome_ver <- "BSgenome.Hsapiens.UCSC.hg38"
 }
-project        <- opt$project_name
 opt_q          <- opt$opt_q     # base quality filter for loading of bam files
 opt_mq         <- opt$opt_mq      # map quality filter for loading of bam files 
 contig_id      <- opt$contig_id # contig id
@@ -420,7 +417,7 @@ paste0(df[1],"\t",as.integer(df[2]),"\t.\t",df[3],"\t",df[4],"\t",".","\t",".","
                    paste0('NS=',sum(!is.na(df[-(1:4)]))),"\t",'GT:AD:DP',"\t",
                   str_c(sapply(df[-(1:4)], get_row_info, df[3],df[4]),collapse = "\t"),"\n")
 }
-write_vcf_header(project,contig)
-sink(paste0(project,"_",contig,".vcf"),append = TRUE)
+write_vcf_header(contig)
+sink(paste0(contig,".vcf"),append = TRUE)
 cat(apply(snv_df,1,vcf_lines),sep = '')
 sink()
