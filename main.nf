@@ -147,8 +147,8 @@ process deepSNV {
     input:
     set file('tumor/*'), file('tumor/*'), chr from bamTumor
     set file('normal/*'), file('normal/*'), input from bamNormal
-    id_project from ch_id_project
-        file(bed) from ch_target_bed
+    val id_project from ch_id_project
+    file(bed) from ch_target_bed
 
     output:
     file("*vcf") into deepSNV_out
