@@ -183,7 +183,7 @@ process concatenateVcfs {
     options = params.target_bed ? "-t ${targetBED}" : ""
     intervalsOptions = params.no_intervals ? "-n" : ""
     """
-    awk '$2 ~ /^[0-9]+$/' $targetBED > tmp && mv tmp $targetBED
+    awk '\$2 ~ /^[0-9]+$/' $targetBED > tmp && mv tmp $targetBED
     concatenateVCFs.sh -i ${fai} -c ${task.cpus} -o ${outputFile} ${options} ${intervalsOptions}
     """
 }
