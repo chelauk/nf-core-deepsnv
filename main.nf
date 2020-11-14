@@ -176,14 +176,14 @@ process concatenateVcfs {
     file(targetBED) from ch_target_bed
 
     output:
-    set file("*vcf.gz"), file("*vcf.gz.tbi")  into concatVCF_out
+    set file("${id_project}_deepSNV.vcf.gz"), file("${id_project}_deepSNV.vcf.gz.tbi")  into concatVCF_out
 
     script:
     outputFile = "${id_project}_deepSNV.vcf"
     options = params.target_bed ? "-t ${targetBED}" : ""
     intervalsOptions = params.no_intervals ? "-n" : ""
     """
-    awk '\$2 ~ /^[0-9]+$/' $targetBED > tmp && mv tmp $targetBED
+    awk '\$2 ~ /^[0-9]+\$/' $targetBED > tmp && mv tmp $targetBED
     concatenateVCFs.sh -i ${fai} -c ${task.cpus} -o ${outputFile} ${options} ${intervalsOptions}
     """
 }
